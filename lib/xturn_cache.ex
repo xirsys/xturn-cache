@@ -25,6 +25,7 @@
 defmodule Xirsys.XTurn.Cache.Store do
   @vsn "0"
   require Logger
+  use Agent
   @moduledoc """
   Simple caching module with TTL, used by the XTurn TURN server project.
   """
@@ -64,8 +65,8 @@ defmodule Xirsys.XTurn.Cache.Store do
       iex> Xirsys.XTurn.Cache.Store.append_item_to_store(ctx, {"key", "value"})
       :ok
   """
-  @spec append_item_to_store(pid(), {term(), term()}) :: :ok | no_return
-  def append_item_to_store(agent, {id, ndata}) do
+  @spec append(pid(), {term(), term()}) :: :ok | no_return
+  def append(agent, {id, ndata}) do
     {store, lt, _cb} = get_state(agent)
 
     new_store =
@@ -104,13 +105,13 @@ defmodule Xirsys.XTurn.Cache.Store do
       iex> Xirsys.XTurn.Cache.Store.append_items_to_store(ctx, [{"key", "value"}, {"key2", "value2"}])
       :ok
   """
-  @spec append_items_to_store(pid(), list({term(), term()})) :: :ok | no_return
-  def append_items_to_store(_agent, []),
+  @spec append_many(pid(), list({term(), term()})) :: :ok | no_return
+  def append_many(_agent, []),
     do: :ok
 
-  def append_items_to_store(agent, [elem | tail] = _elems) do
-    append_item_to_store(agent, elem)
-    append_items_to_store(agent, tail)
+  def append_many(agent, [elem | tail] = _elems) do
+    append(agent, elem)
+    append_many(agent, tail)
   end
 
   @doc """
@@ -127,8 +128,8 @@ defmodule Xirsys.XTurn.Cache.Store do
       iex> Xirsys.XTurn.Cache.Store.remove_item_from_store(ctx, "key")
       :ok
   """
-  @spec remove_item_from_store(pid(), term()) :: :ok | no_return
-  def remove_item_from_store(agent, id) do
+  @spec remove(pid(), term()) :: :ok | no_return
+  def remove(agent, id) do
     {store, _, _} = get_state(agent)
     new_store = Map.delete(store, id)
     update_store(agent, new_store)
@@ -156,8 +157,8 @@ defmodule Xirsys.XTurn.Cache.Store do
   @doc """
   Returns the number of keys in the cache.
   """
-  @spec get_item_count(pid()) :: integer()
-  def get_item_count(agent) do
+  @spec item_count(pid()) :: integer()
+  def item_count(agent) do
     {store, _, _} = get_state(agent)
     Kernel.map_size(store)
   end
