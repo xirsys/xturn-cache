@@ -25,20 +25,46 @@
 defmodule Xirsys.XTurn.Cache.Store do
   @vsn "0"
   require Logger
+  @moduledoc """
+  Simple caching module with TTL, used by the XTurn TURN server project.
+  """
 
   ###########################
   # MESSY - NEEDS IMPROVING
   ###########################
 
+  @doc """
+  Create a cache context.
+  """
+  @spec init(integer()) :: {:ok, pid()}
   def init(),
     do: Agent.start_link(fn -> {%{}, 300_000, nil} end)
 
+  @doc """
+  Create a cache context with specified TTL.
+  """
   def init(lifetime),
     do: Agent.start_link(fn -> {%{}, lifetime, nil} end)
 
+  @doc """
+  Create a cache context with specified TTL and onTTL callback.
+  """
   def init(lifetime, callback),
     do: Agent.start_link(fn -> {%{}, lifetime, callback} end)
 
+  @doc """
+  Add a value by key.
+
+  Returns `:ok`
+
+  ## Examples
+
+      iex> ctx = Xirsys.XTurn.Cache.Store.init()
+      {:ok, pid()}
+      iex> Xirsys.XTurn.Cache.Store.append_item_to_store(ctx, {"key", "value"})
+      :ok
+  """
+  @spec append_item_to_store(pid(), {term(), term()}) :: :ok | no_return
   def append_item_to_store(agent, {id, ndata}) do
     {store, lt, _cb} = get_state(agent)
 
@@ -66,6 +92,19 @@ defmodule Xirsys.XTurn.Cache.Store do
     :ok
   end
 
+  @doc """
+  Add multiple key / value's.
+
+  Returns `:ok`
+
+  ## Examples
+
+      iex> ctx = Xirsys.XTurn.Cache.Store.init()
+      {:ok, pid()}
+      iex> Xirsys.XTurn.Cache.Store.append_items_to_store(ctx, [{"key", "value"}, {"key2", "value2"}])
+      :ok
+  """
+  @spec append_items_to_store(pid(), list({term(), term()})) :: :ok | no_return
   def append_items_to_store(_agent, []),
     do: :ok
 
@@ -74,6 +113,21 @@ defmodule Xirsys.XTurn.Cache.Store do
     append_items_to_store(agent, tail)
   end
 
+  @doc """
+  Removes a key and its value.
+
+  Returns `:ok`
+
+  ## Examples
+
+      iex> ctx = Xirsys.XTurn.Cache.Store.init()
+      {:ok, pid()}
+      iex> Xirsys.XTurn.Cache.Store.append_item_to_store(ctx, {"key", "value"})
+      :ok
+      iex> Xirsys.XTurn.Cache.Store.remove_item_from_store(ctx, "key")
+      :ok
+  """
+  @spec remove_item_from_store(pid(), term()) :: :ok | no_return
   def remove_item_from_store(agent, id) do
     {store, _, _} = get_state(agent)
     new_store = Map.delete(store, id)
@@ -81,27 +135,50 @@ defmodule Xirsys.XTurn.Cache.Store do
     :ok
   end
 
+  @doc """
+  Returns true if a key exists; otherwise false.
+  """
+  @spec has_key?(pid(), term()) :: boolean()
   def has_key?(agent, id) do
     {store, _, _} = get_state(agent)
     Map.has_key?(store, id)
   end
 
+  @doc """
+  Returns all the keys in the cache.
+  """
+  @spec keys(pid()) :: list()
   def keys(agent) do
     {store, _, _} = get_state(agent)
     Map.keys(store)
   end
 
+  @doc """
+  Returns the number of keys in the cache.
+  """
+  @spec get_item_count(pid()) :: integer()
   def get_item_count(agent) do
     {store, _, _} = get_state(agent)
     Kernel.map_size(store)
   end
 
+  @doc """
+  Destroys the cache (cleanup).
+  """
+  @spec terminate(pid()) :: :ok
   def terminate(agent),
     do: Agent.stop(agent)
 
+  @doc """
+  Returns the agent state as a raw map.
+  """
+  @spec get_state(pid()) :: map()
   def get_state(agent),
     do: Agent.get(agent, fn {s, l, c} -> {s, l, c} end)
 
+  @doc """
+  Not to be called directly. Used by the cache to timeout keys.
+  """
   def timer_callback(agent, id) do
     {store, _, cb} = get_state(agent)
     Logger.info("Deleting item #{inspect(id)}")
@@ -111,6 +188,10 @@ defmodule Xirsys.XTurn.Cache.Store do
     :ok
   end
 
+  @doc """
+  Returns the value of a key.
+  """
+  @spec fetch(pid(), term()) :: {:ok, term()} | :error
   def fetch(agent, id) do
     {store, _, _} = get_state(agent)
 
