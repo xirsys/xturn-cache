@@ -1,6 +1,6 @@
 ### ----------------------------------------------------------------------
 ###
-### Copyright (c) 2013 - 2018 Lee Sylvester and Xirsys LLC <experts@xirsys.com>
+### Copyright (c) 2013 - 2018 Jahred Love and Xirsys LLC <experts@xirsys.com>
 ###
 ### All rights reserved.
 ###
@@ -26,6 +26,7 @@ defmodule Xirsys.XTurn.Cache.Store do
   @vsn "0"
   require Logger
   use Agent
+
   @moduledoc """
   Simple caching module with TTL, used by the XTurn TURN server project.
   """
@@ -62,32 +63,14 @@ defmodule Xirsys.XTurn.Cache.Store do
 
       iex> ctx = Xirsys.XTurn.Cache.Store.init()
       {:ok, pid()}
-      iex> Xirsys.XTurn.Cache.Store.append_item_to_store(ctx, {"key", "value"})
+      iex> Xirsys.XTurn.Cache.Store.append(ctx, {"key", "value"})
       :ok
   """
   @spec append(pid(), {term(), term()}) :: :ok | no_return
   def append(agent, {id, ndata}) do
     {store, lt, _cb} = get_state(agent)
 
-    new_store =
-      case start_item_timer(agent, lt, id) do
-        {:ok, tref} ->
-          data =
-            case Map.has_key?(store, id) do
-              true ->
-                {:ok, {t, d}} = Map.fetch(store, id)
-                :timer.cancel(t)
-                if ndata, do: ndata, else: d
-
-              _ ->
-                ndata
-            end
-
-          Map.put(store, id, {tref, data})
-
-        _ ->
-          Map.put(store, id, {nil, ndata})
-      end
+    new_store = create_element(agent, lt, id, store, ndata)
 
     update_store(agent, new_store)
     :ok
@@ -190,7 +173,7 @@ defmodule Xirsys.XTurn.Cache.Store do
   end
 
   @doc """
-  Returns the value of a key.
+  Returns the value of a key in an erlang success tuple.
   """
   @spec fetch(pid(), term()) :: {:ok, term()} | :error
   def fetch(agent, id) do
@@ -202,6 +185,44 @@ defmodule Xirsys.XTurn.Cache.Store do
 
       _ ->
         :error
+    end
+  end
+
+  @doc """
+  Returns the value of a key or nil if not exists.
+  """
+  @spec fetch!(pid(), term()) :: term() | nil
+  def fetch!(agent, id) do
+    {store, _, _} = get_state(agent)
+
+    case Map.fetch(store, id) do
+      {:ok, {_t, d}} ->
+        d
+
+      _ ->
+        nil
+    end
+  end
+
+  defp create_element(agent, lt, id, store, ndata) do
+    case start_item_timer(agent, lt, id) do
+      {:ok, tref} ->
+        Map.put(store, id, {tref, fetch_from_store(store, id, ndata)})
+
+      _ ->
+        Map.put(store, id, {nil, ndata})
+    end
+  end
+
+  defp fetch_from_store(store, id, ndata) do
+    case Map.has_key?(store, id) do
+      true ->
+        {:ok, {t, d}} = Map.fetch(store, id)
+        :timer.cancel(t)
+        if ndata, do: ndata, else: d
+
+      _ ->
+        ndata
     end
   end
 

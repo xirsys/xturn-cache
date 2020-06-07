@@ -8,6 +8,6 @@ This package can be installed by adding `xturn_cache` to your list of dependenci
 
 ```elixir
 def deps do
-  [{:xturn_cache, "~> 0.1.0"}]
+  [{:xturn_cache, "~> 0.1"}]
 end
 ```

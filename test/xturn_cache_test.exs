@@ -14,6 +14,11 @@ defmodule CacheTest do
     assert fetch(state, :item1) == {:ok, "this is item one"}
   end
 
+  test "can retrieve item from store with ! format", %{state: state} do
+    assert item_count(state) == 1
+    assert fetch!(state, :item1) == "this is item one"
+  end
+
   test "item times out after lifetime", %{state: state} do
     assert item_count(state) == 1
 
